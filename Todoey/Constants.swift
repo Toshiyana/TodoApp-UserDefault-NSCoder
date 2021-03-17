@@ -6,4 +6,7 @@
 //  Copyright © 2021 App Brewery. All rights reserved.
 //
 
-import Foundation
+struct K {
+    static let cellIdentifier = "ToDoItemCell"
+    static let todoArrayName = "ToDoListArray"
+}

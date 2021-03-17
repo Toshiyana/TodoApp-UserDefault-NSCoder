@@ -9,22 +9,33 @@
 import UIKit
 
 class TodoListViewController: UITableViewController {
-
-    let defaults = UserDefaults.standard//localにdataを保存するためのuserdefaultを定義
     
-    var itemArray = [
-        "buy apple", "play teniss", "study math"
-    ]
+    var itemArray = [Item]()
+    
+    let dataFilePath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent("Items.plist")//自作のcustom object(itemArray)を保存する.plistファイルまでのpath
     
     //UITableViewControllerでは，TableViewとは異なり，tableView.dataSource=selfやtableView.delegate=selfが必要ない（protocolにはdefaultで従っている）
     override func viewDidLoad() {
         super.viewDidLoad()
+
+        //print(dataFilePath)
         
-        //localのuserdefaultに保存されているdataを取得
-        //userdefaultにdataがない場合，clashする可能性があるのでoptionalを利用
-        if let items = defaults.array(forKey: K.todoArrayName) as? [String] {
-            itemArray = items
-        }
+        //Items.plistにすでに追加されていので記述する必要ない
+//        var newItem = Item()
+//        newItem.title = "buy apples"
+//        itemArray.append(newItem)
+//
+//        var newItem2 = Item()
+//        newItem2.title = "do homework"
+//        itemArray.append(newItem2)
+//
+//        var newItem3 = Item()
+//        newItem3.title = "play tennis"
+//        itemArray.append(newItem3)
+
+        
+        //localの自作plistファイルに保存されているdataを取得
+        loadItems()
     }
     
     //MARK: - Tableview Datasource Methods
@@ -33,9 +44,27 @@ class TodoListViewController: UITableViewController {
     }
     
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        print("cellForRowAtIndexPath Called")//iterateするのでitemArrayの要素数分だけ呼び出される
+        
+        //UITableViewCellと結びつけた場合，仮にcellにcheckmarkをつけて画面を下にscrollしてcheckしたcellが見えなくなり，またそのcheckしたcellを見ようとするとcheckが取れているのでダメ（cellが見えなくなると破棄されるため）
+        //let cell = UITableViewCell(style: .default, reuseIdentifier: K.cellIdentifier)
+        
         //UITableViewControllerではIBOutletを定義しなくてもdefaultでtableViewが定義されている
         let cell = tableView.dequeueReusableCell(withIdentifier: K.cellIdentifier, for: indexPath)
-        cell.textLabel?.text = itemArray[indexPath.row]
+        let item = itemArray[indexPath.row]
+        cell.textLabel?.text = item.title
+        
+        //Ternary opratorを用いてシンプルに記述
+        cell.accessoryType = item.isChecked ? .checkmark : .none
+        //冗長1
+        //cell.accessoryType = item.isChecked == true ? .checkmark : .none
+        //冗長2
+//        if item.isChecked == true {
+//            cell.accessoryType = .checkmark
+//        } else {
+//            cell.accessoryType = .none
+//        }
+        
         return cell
     }
     
@@ -46,12 +75,10 @@ class TodoListViewController: UITableViewController {
         //print(indexPath.row)
         //print(itemArray[indexPath.row])
         
-        //tapしたcellにcheckmarkをつける（accessory），すでにcheckmarkがついていたら外す
-        if tableView.cellForRow(at: indexPath)?.accessoryType == .checkmark {
-            tableView.cellForRow(at: indexPath)?.accessoryType = .none
-        } else {
-            tableView.cellForRow(at: indexPath)?.accessoryType = .checkmark
-        }
+        //tapしたcellにcheckmarkをつける，すでにcheckmarkがついていたら外す
+        itemArray[indexPath.row].isChecked = !itemArray[indexPath.row].isChecked//trueだったらfalseに反転
+
+        self.saveItems()
         
         //cellをtapして選択した後，選択されてない状態にする＝tapしたら灰色になり，すぐ元に戻る
         tableView.deselectRow(at: indexPath, animated: true)
@@ -66,13 +93,14 @@ class TodoListViewController: UITableViewController {
         
         let action = UIAlertAction(title: "Add Item", style: .default) { (action) in
             //What will happen once the user clicks the Add Item button on our UIAlert
+            
+            var newItem = Item()
+            newItem.title = textField.text!
+            
             //このブロックはcompletion handlerなので，"Add Item"が押された後に発火する
-            self.itemArray.append(textField.text!)//今の状態だとtextが空の時に""が追加される（textが空の時にvalidationを後でつける)
-            
-            self.defaults.set(self.itemArray, forKey: K.todoArrayName)
-            
-            self.tableView.reloadData()
-            print("Success!")
+            self.itemArray.append(newItem)//今の状態だとtextが空の時に""が追加される（textが空の時にvalidationを後でつける)
+            self.saveItems()
+            //print("Success!")
         }
         
         alert.addTextField { (alertTextField) in
@@ -85,4 +113,28 @@ class TodoListViewController: UITableViewController {
         present(alert, animated: true, completion: nil)
     }
     
+    //MARK: - Model Manupulation Methods
+    func saveItems() {
+        let encoder = PropertyListEncoder()
+        
+        do {
+            let data = try encoder.encode(itemArray)
+            try data.write(to: dataFilePath!)
+        } catch {
+            print("Error encodeing item array. \(error)")
+        }
+        
+        self.tableView.reloadData()
+    }
+
+    func loadItems() {
+        if let data = try? Data(contentsOf: dataFilePath!) {
+            let decoder = PropertyListDecoder()
+            do {
+                itemArray = try decoder.decode([Item].self, from: data)
+            } catch {
+                print("Error decoding item array. \(error)")
+            }
+        }
+    }
 }
